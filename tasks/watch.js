@@ -15,6 +15,23 @@ module.exports = function(grunt) {
   var path = require('path');
   var fs = require('fs');
   var Gaze = require('gaze').Gaze;
+  var _       = require('underscore')
+  var io      = require('socket.io')
+  io          = io.listen(8003)
+
+  io.configure(function () {
+      io.set('transports', ['websocket']);
+  });
+
+  var mysocket;
+
+  io.sockets.on('connection', function (socket) {
+    mysocket = socket;
+
+    socket.on('change', function (data) {
+      socket.broadcast('reload', {});
+    })
+  });
 
   // In Nodejs 0.8.0, existsSync moved from path -> fs.
   // TODO: When 0.4 is release, use grunt.file.exists
@@ -26,16 +43,15 @@ module.exports = function(grunt) {
   };
 
   grunt.registerTask('watch', 'Run predefined tasks whenever watched files change.', function(target) {
-    var name = this.name || 'watch';
-    this.requiresConfig(name);
+    this.requiresConfig('watch');
     // Build an array of files/tasks objects
-    var watch = grunt.config(name);
+    var watch = grunt.config('watch');
     var targets = target ? [target] : Object.keys(watch).filter(function(key) {
       return typeof watch[key] !== 'string' && !Array.isArray(watch[key]);
     });
     targets = targets.map(function(target) {
       // Fail if any required config properties have been omitted
-      target = [name, target];
+      target = ['watch', target];
       this.requiresConfig(target.concat('files'), target.concat('tasks'));
       return grunt.config(target);
     }, this);
@@ -73,19 +89,22 @@ module.exports = function(grunt) {
         grunt.log.ok();
         var fileArray = Object.keys(changedFiles);
         fileArray.forEach(function(filepath) {
+          var status = changedFiles[filepath];
           // Log which file has changed, and how.
-          grunt.log.ok('File "' + filepath + '" ' + changedFiles[filepath] + '.');
+          grunt.log.ok('File "' + filepath + '" ' + status + '.');
+          // Add filepath to grunt.file.watchFiles for grunt.file.expand* methods.
+          grunt.file.watchFiles[status].push(filepath);
         });
         // Reset changedFiles
         changedFiles = Object.create(null);
         // Spawn the tasks as a child process
         spawned[i] = grunt.util.spawn({
-          // Spawn with the grunt bin
-          grunt: true,
+          // Use the node that spawned this process
+          cmd: process.argv[0],
           // Run from current working dir
           opts: {cwd: process.cwd()},
           // Run grunt this process uses, append the task to be run and any cli options
-          args: grunt.util._.union(tasks, cliArgs)
+          args: grunt.util._.union([process.argv[1]].concat(tasks), cliArgs)
         }, function(err, res, code) {
           // Spawn is done
           delete spawned[i];
@@ -97,6 +116,10 @@ module.exports = function(grunt) {
           buf = grunt.log.uncolor(String(buf));
           if (!grunt.util._.isBlank(buf)) { grunt.log.error(buf); }
         });
+        _.delay(function() {
+          mysocket.emit('reload', {});
+        }, 3000)
+        
       }
     }, 250);
 
@@ -119,6 +142,9 @@ module.exports = function(grunt) {
           filepath = path.relative(process.cwd(), filepath);
           changedFiles[filepath] = status;
           runTasks(i, target.tasks, options);
+          
+          
+          //mysocket.broadcast.emit('reload', {});
         });
         // On watcher error
         this.on('error', function(err) { grunt.log.error(err); });
