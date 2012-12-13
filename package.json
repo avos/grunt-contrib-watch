@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "gaze": "~0.2.0",
+    "shelljs": "0.0.9",
     "socket.io": "0.9.11",
     "underscore": "1.4.3"
   },

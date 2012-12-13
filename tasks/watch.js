@@ -15,6 +15,8 @@ module.exports = function(grunt) {
   var path = require('path');
   var fs = require('fs');
   var Gaze = require('gaze').Gaze;
+  require('shelljs/global');
+  exec('ulimit -n 9999')
   var _       = require('underscore')
   var io      = require('socket.io')
   io          = io.listen(8003)
