@@ -22,7 +22,8 @@ module.exports = function(grunt) {
   io          = io.listen(8003)
 
   io.configure(function () {
-      io.set('transports', ['websocket']);
+    io.set('log level', 0);
+    io.set('transports', ['websocket']);
   });
 
   var mysocket;
